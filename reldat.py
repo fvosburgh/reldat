@@ -41,6 +41,9 @@ class Reldat:
         # working regex (?<!\\x)(\d{2,3}\.){3}\d{1,3}
         # has issues in interpreter, dont know why yet
 
+        # Use pickle protocol 0 for ascii encoding, then convert to string
+        # before regexing?
+
 
 
 
