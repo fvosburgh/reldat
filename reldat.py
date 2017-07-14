@@ -7,8 +7,13 @@ from io import BytesIO
 class Reldat:
 
     MAX_PAYLOAD_SIZE = 1000
+    WINDOW_SIZE = 0
 
     recv_buff = BytesIO()
+
+    # Since we're writing to this buffer in another thread, we need a mutex
+    recv_buff_mutex = Lock()
+
 
     # pickle delimmeter for each dump is \x80\x04\x95#
     # the # after \x95 denotes an object rather than a primitive
@@ -20,10 +25,21 @@ class Reldat:
         sock.bind(addr, port)
         return sock
 
+    def set_window(window_size):
+        WINDOW_SIZE = window_size
+
+    # This function is a wrapper for the receving thread start function for
+    # the socket. This should only be called once.
     def listen(socket):
         recv_window = 1048
-        socket.start_receive(recv_window, recv_buff)
+        socket.start_receive(recv_window, recv_buff, recv_buff_mutex)
 
+    def get_data():
+        while recv_buff.getvalue() is 0:
+            pass
+        #TODO parse the buffer into packets to be deserialized
+        # working regex (?<!\\x)(\d{2,3}\.){3}\d{1,3}
+        # has issues in interpreter, dont know why yet
 
 
 
@@ -102,8 +118,9 @@ class ReldatSocket:
     # This function spawns a thread that continuously receives data
     # on the socket. The thread runs as a daemon so that it is non blocking
     # on program termination
-    def start_receive(recv_window_size, recv_buffer):
-        t = Thread(target = receive, args = (recv_window_size, recv_buffer))
+    def start_receive(recv_window_size, recv_buffer, recv_buffer_mutex):
+        t = Thread(target = receive, args = (recv_window_size, recv_buffer,
+                                             recv_buffer_mutex))
         t.setDaemon(True)
         t.start()
 
@@ -114,13 +131,15 @@ class ReldatSocket:
     #TODO
     # How should we handle a changing window size? Is it appropriate to even
     # use window size here?
-    def receive(self, recv_window_size, recv_buffer):
+    def receive(self, recv_window_size, recv_buffer, recv_buffer_mutex):
         while True and not self.throttle:
             try:
                 socket_mutex.acquire()
                 data, addr = self._socket.recvfrom(int(recv_window_size))
                 socket_mutex.release()
+                recv_buffer_mutex.acquire()
                 recv_buffer.write(bytes(addr, encoding='ascii') + data)
+                recv_buffer_mutex.release()
             except Exception as e:
                 print("Socket error while receiving: ", e)
 
