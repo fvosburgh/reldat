@@ -1,11 +1,17 @@
 import socket
 import md5
 import pickle
+from threading import Thread, Lock
+from io import BytesIO
 
 class Reldat:
 
 
 class ReldatSocket:
+
+    # Use a byte stream buffer to store incoming data for Reldat to parse
+    # This is out recv buffer
+    data_buffer = BytesIO()
 
     def __init__(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -20,6 +26,10 @@ class ReldatSocket:
         self.source_addr = None
         self.dest_addr = None
 
+        # This determines whether or not we need to stop receiving so that the
+        # protocol can finish processing the recv_buffer
+        self.throttle = False
+
         print("Socket initialized")
 
     def bind(self, ip_addr, port):
@@ -32,6 +42,36 @@ class ReldatSocket:
     def set_dest(self, ip_addr, port):
         addr = (ip_addr, port)
         self.dest_addr = addr
+
+    # The socket is considered connected only when the 3-way handshake is
+    # complete. We leave this work to the Reldat protocol encapsulated class.
+    def connected(self):
+        self.state = "connected"
+
+    def close(self):
+        self._socket.close()
+        self.state = "closed"
+
+    def send(self, packet):
+        self._socket.sendto(packet.serialize(), self.dest_addr)
+
+    def throttle(self):
+        self.throttle = True
+
+    def remove_throttle(self):
+        self.throttle = False
+
+    #TODO better timeout calculation
+    # This needs to be a threaded function since we will always be Listening
+    # for incoming packets from various connections
+    def receive(self, recv_window_size):
+        while True and not self.throttle:
+            try:
+                data, addr = self._socket.recvfrom(int(recv_window_size))
+            except Exception as e:
+                print("Socket error while receiving: ", e)
+
+
 
 class ReldatPacket:
     class PacketHeader:
@@ -47,12 +87,15 @@ class ReldatPacket:
             self.checksum = 0
             self.payload_length = 0
 
+        # We stringify the header to have data for the packet checksum
         def to_string(self):
             retval = ""
             for attr, value in self.__dict__.items():
                 if attr != "checksum":
                     retval += value
             return retval
+
+        # END PACKETHEADER CLASS
 
     def __init__(self, data = None):
         self.header = PacketHeader()
@@ -71,4 +114,6 @@ class ReldatPacket:
 
     def serialize(self):
         # use pickle to serialize our objects to be sent over the wire
-        return pickle.dumps(self)
+        # We use the HIGHEST_PROTOCOL to convert to a byte stream rather
+        # than a string.
+        return pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL)
