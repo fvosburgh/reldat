@@ -67,7 +67,7 @@ class ReldatPacket:
         # we don't include the checksum in the header when computing the
         # checksum for the packet. So, to verify a checksum, we recompute
         # the packets checksum and compare it to the one in the header
-        return self.checksum == self.header.checksum
+        return checksum() == self.header.checksum
 
     def serialize(self):
         # use pickle to serialize our objects to be sent over the wire
