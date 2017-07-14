@@ -1,4 +1,6 @@
 import socket
+import md5
+import pickle
 
 class Reldat:
 
@@ -45,6 +47,13 @@ class ReldatPacket:
             self.checksum = 0
             self.payload_length = 0
 
+        def to_string(self):
+            retval = ""
+            for attr, value in self.__dict__.items():
+                if attr != "checksum":
+                    retval += value
+            return retval
+
     def __init__(self, data = None):
         self.header = PacketHeader()
         self.data = data or ' '
@@ -52,3 +61,14 @@ class ReldatPacket:
         self.header.checksum = checksum()
 
     def checksum(self):
+        return md5.new(self.header.to_string + self.data).digest()
+
+    def verify(self):
+        # we don't include the checksum in the header when computing the
+        # checksum for the packet. So, to verify a checksum, we recompute
+        # the packets checksum and compare it to the one in the header
+        return self.checksum == self.header.checksum
+
+    def serialize(self):
+        # use pickle to serialize our objects to be sent over the wire
+        return pickle.dumps(self)
