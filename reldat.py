@@ -6,6 +6,10 @@ from io import BytesIO
 
 class Reldat:
 
+    MAX_PAYLOAD_SIZE = 1000
+
+    recv_buff = BytesIO()
+
     # pickle delimmeter for each dump is \x80\x04\x95#
     # the # after \x95 denotes an object rather than a primitive
     # Also look into using '.' as the delimmeter. Looks like pickle adds
@@ -15,6 +19,13 @@ class Reldat:
         sock = ReldatSocket()
         sock.bind(addr, port)
         return sock
+
+    def listen(socket):
+        recv_window = 1048
+        socket.start_receive(recv_window, recv_buff)
+
+
+
 
 
 
@@ -26,6 +37,10 @@ class ReldatSocket:
     # Use this mutex to control when to throttle the listening threading
     throttle_mutex = Lock()
 
+    # Use this mutex to ensure that we're not listening when we're trying to
+    # send on the socket and vice versa
+    socket_mutex = Lock()
+
     def __init__(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -35,9 +50,10 @@ class ReldatSocket:
         # Start with 10 second timeout
         self._socket.settimeout(10)
 
-        # Need to keep track of
+        # We don't need to keep track of dest_addr as the protocol
+        # will demux the incoming packets and determine which client to
+        # respond to
         self.source_addr = None
-        self.dest_addr = None
 
         # This determines whether or not we need to stop receiving so that the
         # protocol can finish processing the recv_buffer
@@ -54,10 +70,6 @@ class ReldatSocket:
         self.state = "bound"
         print("Socket bound to port", str(port))
 
-    def set_dest(self, ip_addr, port):
-        addr = (ip_addr, port)
-        self.dest_addr = addr
-
     # The socket is considered connected only when the 3-way handshake is
     # complete. We leave this work to the Reldat protocol encapsulated class.
     def connected(self):
@@ -67,8 +79,15 @@ class ReldatSocket:
         self._socket.close()
         self.state = "closed"
 
-    def send(self, packet):
-        self._socket.sendto(packet.serialize(), self.dest_addr)
+    def send(self, packet, dest_addr):
+
+        #NOTE
+        # some concern about deadlock here. What if we're stuck listening
+        # because nothing is coming in, but we want to send data still?
+        # Can we rely on a timeout of some sort for listening?
+        socket_mutex.acquire()
+        self._socket.sendto(packet.serialize(), dest_addr)
+        socket_mutex.release()
 
     def throttle(self):
         throttle_mutex.acquire()
@@ -80,14 +99,28 @@ class ReldatSocket:
         self.throttle = False
         throttle_mutex.release()
 
+    # This function spawns a thread that continuously receives data
+    # on the socket. The thread runs as a daemon so that it is non blocking
+    # on program termination
+    def start_receive(recv_window_size, recv_buffer):
+        t = Thread(target = receive, args = (recv_window_size, recv_buffer))
+        t.setDaemon(True)
+        t.start()
+
     #TODO better timeout calculation
     # This needs to be a threaded function since we will always be Listening
     # for incoming packets from various connections
+
+    #TODO
+    # How should we handle a changing window size? Is it appropriate to even
+    # use window size here?
     def receive(self, recv_window_size, recv_buffer):
         while True and not self.throttle:
             try:
+                socket_mutex.acquire()
                 data, addr = self._socket.recvfrom(int(recv_window_size))
-                recv_buffer.write(data)
+                socket_mutex.release()
+                recv_buffer.write(bytes(addr, encoding='ascii') + data)
             except Exception as e:
                 print("Socket error while receiving: ", e)
 
