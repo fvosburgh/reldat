@@ -6,12 +6,25 @@ from io import BytesIO
 
 class Reldat:
 
+    # pickle delimmeter for each dump is \x80\x04\x95#
+    # the # after \x95 denotes an object rather than a primitive
+    # Also look into using '.' as the delimmeter. Looks like pickle adds
+    # a period after every dump
+
+    def createSocket(addr, port):
+        sock = ReldatSocket()
+        sock.bind(addr, port)
+        return sock
+
+
 
 class ReldatSocket:
 
-    # Use a byte stream buffer to store incoming data for Reldat to parse
-    # This is out recv buffer
-    data_buffer = BytesIO()
+    #TODO remove erronious prints when done testing
+
+    #TODO do we need threading?
+    # Use this mutex to control when to throttle the listening threading
+    throttle_mutex = Lock()
 
     def __init__(self):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -28,7 +41,9 @@ class ReldatSocket:
 
         # This determines whether or not we need to stop receiving so that the
         # protocol can finish processing the recv_buffer
+        throttle_mutex.acquire()
         self.throttle = False
+        throttle_mutex.release()
 
         print("Socket initialized")
 
@@ -56,18 +71,23 @@ class ReldatSocket:
         self._socket.sendto(packet.serialize(), self.dest_addr)
 
     def throttle(self):
+        throttle_mutex.acquire()
         self.throttle = True
+        throttle_mutex.release()
 
     def remove_throttle(self):
+        throttle_mutex.acquire()
         self.throttle = False
+        throttle_mutex.release()
 
     #TODO better timeout calculation
     # This needs to be a threaded function since we will always be Listening
     # for incoming packets from various connections
-    def receive(self, recv_window_size):
+    def receive(self, recv_window_size, recv_buffer):
         while True and not self.throttle:
             try:
                 data, addr = self._socket.recvfrom(int(recv_window_size))
+                recv_buffer.write(data)
             except Exception as e:
                 print("Socket error while receiving: ", e)
 
