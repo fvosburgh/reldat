@@ -50,8 +50,22 @@ class Reldat:
         return ReldatPacket(header, data)
 
     # listen for and accept an incoming connection and complete the handshake
+    # SERVER SIDE
     def accept(socket):
-        addr, data = socket.receive(247)
+        pass
+
+    # initiate a connection
+    # CLINET SIDE
+    def connect(socket, addr):
+        pass
+
+    # send all data to remote
+    def send_data(socket, data):
+        pass
+
+    # receive all data from remote
+    def receive_data(socket):
+        pass
 
 class Connection:
     def __init__(self, addr = None):
@@ -69,10 +83,8 @@ class ReldatSocket:
         # Start with 10 second timeout
         self._socket.settimeout(10)
 
-        # We don't need to keep track of dest_addr as the protocol
-        # will demux the incoming packets and determine which client to
-        # respond to
         self.source_addr = None
+        self.dest_addr = None
 
         print("Socket initialized")
 
