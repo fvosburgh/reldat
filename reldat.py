@@ -8,8 +8,9 @@ from io import BytesIO
 class Reldat:
 
     MAX_PAYLOAD_SIZE = 1000
-    WINDOW_SIZE = 0
     MAX_RECV_SIZE = 3200 # max packet size is around 3100, add more for safety
+
+    window = 0
 
     # pickle delimmeter for each dump is \x80\x04\x95#
     # the # after \x95 denotes an object rather than a primitive
@@ -22,7 +23,7 @@ class Reldat:
         return sock
 
     def set_window(size):
-        WINDOW_SIZE = size
+        window = size
 
     # listen for and accept an incoming connection and complete the handshake
     # SERVER SIDE
@@ -65,23 +66,30 @@ class Reldat:
 
                 header = PacketHeader()
                 header.seq_num = curr_seq_num
+                header.window = window
                 packet = ReldatPacket(header, payload)
                 packets_to_send.update({str(curr_seq_num) : packet})
 
         # reset seq num for indexing into packets_to_send
         curr_seq_num = connection.get_seq_num
 
+        # add payload length of first packet to send to current ack_num
+        # to get the next desired ack
+        next_ack_num = connection.get_ack_num() +  \
+                       len(packets_to_send[str(curr_seq_num)].data)
+
         #3. Send window sized batch of packets
 
         # pop sent packets off to_send dict into to_ack dict
         packets_to_ack = {}
 
-        window = connection.get_receiver_window_size
+        receiver_window = connection.get_receiver_window_size
+        sender_window = receiver_window
 
         while len(packets_to_send) > 0:
 
             # send batch of packets the size of the recv_window
-            while recv_window > 0:
+            while receiver_window > 0:
                 packet = packets_to_send[str(curr_seq_num)].serialize()
                 padded_packet = pad_packet(packet)
                 socket.send(padded_packet, connection.addr)
@@ -92,26 +100,45 @@ class Reldat:
                 del packets_to_send[str(curr_seq_num)]
 
                 curr_seq_num += packet.header.payload_length
-                window -= 1
+                receiver_window -= 1
 
             # get acks for send packets and update recv window
             # use try block to handle timeouts
-            try:
-                addr, padded_packet = socket.receive(MAX_RECV_SIZE)
+            while sender_window > 0:
+                try:
+                    addr, padded_packet = socket.receive(MAX_RECV_SIZE)
 
-                # concern about error handling here. Differentiate between
-                # timeout and packet corruption?
-                packet = pickle.loads(padded_packet)
+                    # concern about error handling here. Differentiate between
+                    # timeout and packet corruption?
+                    packet = pickle.loads(padded_packet)
 
-                if not packet.verify():
-                    # invalid packet so drop it
-                    pass
-                else:
-                    # implement comparing sequence nums here
-                    # go-back-n implementation
+                    if not packet.verify():
+                        # invalid packet so drop it
+                        # ALSO CHECK TO SEE IF THE PACKET IS EVEN OF TYPE PACKET
+                        pass
+                    else:
+                        # implement comparing sequence nums here
+                        # go-back-n implementation
+                        if packet.header.ack_num < next_ack_num:
+                            # sent packet lost in network, need to resend
+                            # also check to see if we didn't already get a higher ack
+                            # e.g this could be a dup ack. consult the packets_to_be_acked dict
+                            # ordered data structure for queued packets?
+                        elif packet.header.ack_num > next_ack_num:
+                            # received out of order ack packet
+                            # we can update next ack num since we know any preceding
+                            # waiting to be acked packets have been received by the client
+                            # use the seq num in this packet to determine next ack num
+                            # as in line 78
+                            # BE SURE TO REMOVE PACKET FROM packet_to_ack
+                        elif packet.header.ack_num is next_ack_num:
+                            # update next ack num using method above
+                except socket.timeout:
+                    # HANDLE TIMEOUTS
 
-
-
+        # implement this method to signal to the client that the data transfer is over
+        # put some identifying text in the payload or something
+        signal_transfer_end(socket)
 
 
 
@@ -126,6 +153,9 @@ class Reldat:
         # bytearray adds 57 bytes of overhead, so account for that
         padding_size = MAX_RECV_SIZE - sys.getsizeof(packet) - 57
         return packet + bytearray(paddingsize)
+
+    def signal_transfer_end(socket):
+        pass
 
 class Connection:
     def __init__(self, addr = None, sn = 0, an = 0, rws = 0):
