@@ -37,7 +37,7 @@ class Reldat:
     # send all data to remote
     def send_data(socket, data, connection):
         #1. determine number of packets needed to be sent
-        num_packets = MAX_PAYLOAD_SIZE / len(data)
+        num_packets = int(MAX_PAYLOAD_SIZE / len(data))
         if (MAX_PAYLOAD_SIZE % len(data)) is not 0:
             num_packets += 1
 
