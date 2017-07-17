@@ -39,8 +39,8 @@ class Reldat:
     # send all data to remote
     def send_data(socket, data, connection):
         #1. determine number of packets needed to be sent
-        num_packets = int(MAX_PAYLOAD_SIZE / len(data))
-        if (MAX_PAYLOAD_SIZE % len(data)) is not 0:
+        num_packets = int(MAX_PAYLOAD_SIZE / sys.getsizeof(data))
+        if (MAX_PAYLOAD_SIZE % sys.getsizeof(data)) is not 0:
             num_packets += 1
 
         #2. Packetize the data and store in dict
@@ -87,8 +87,8 @@ class Reldat:
 
         while len(packets_to_send) > 0 or len(packets_to_ack) > 0:
 
-            receiver_window = connection.get_receiver_window_size
-            sender_window = receiver_window
+            receiver_window = connection.get_receiver_window_size - len(packets_to_ack)
+            sender_window = connection.get_receiver_window_size
 
             # send batch of packets the size of the recv_window
             while receiver_window > 0 and len(packets_to_send) > 0:
@@ -127,6 +127,8 @@ class Reldat:
                         elif packet.header.ack_num < next_ack_num:
                             # delayed ack, drop it
                             print("SEND: Received ack less than expected: ", (packet.header.ack_num, next_ack_num))
+                            if packet.header.ack_num in packets_to_ack:
+                                del packets_to_ack[packet.header.ack_num]
                             sender_window -= 1
                         elif packet.header.ack_num > next_ack_num:
                             # received out of order ack packet
@@ -134,7 +136,7 @@ class Reldat:
                             print("SEND: Received higher than expected ack ", (packet.header.ack_num, next_ack_num))
                             for i in range(next_ack_num, packet.header.ack_num + 1):
                                 del packet_to_ack[i]
-                                sender_window -= 1
+                            sender_window -= 1
                             next_ack_num = packet.header.ack_num + 1
 
                             connection.seq_num = packet.header.ack_num
@@ -147,6 +149,8 @@ class Reldat:
 
                             connection.seq_num = packet.header.ack_num
                             sender_window -= 1
+
+
 
                 except socket.timeout:
                     print("SEND: socket timeout. resending...")
@@ -161,6 +165,14 @@ class Reldat:
                     print("SEND: mangled packet waiting for", next_ack_num)
                     sender_window -= 1
                     continue
+
+            # add any missed acks back to sender queue
+            for i in packet_to_ack:
+                packets_to_send.update({i : packet_to_ack[i]})
+
+            # after getting acks, reset packets to send index to the next ack
+            # expected
+            curr_seq_num = next_ack_num
 
         # implement this method to signal to the client that the data transfer is over
         # put some identifying text in the payload or something
