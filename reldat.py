@@ -177,7 +177,7 @@ class Reldat:
 
         while True:
             recv_window = connection.get_receiver_window_size()
-            while recv_window > 0
+            while recv_window > 0:
                 try:
                     addr, packet = socket.receive(MAX_RECV_SIZE)
                     packet = pickle.loads(packet)
@@ -189,7 +189,7 @@ class Reldat:
                         if packet.payload == "RELDAT_TIMEOUT":
                             print("RECV: sender timeout. closing connection")
                             return -1
-                        elif packet.header.seq_num = curr_seq_num:
+                        elif packet.header.seq_num == curr_seq_num:
                             print("RECV: got next expected packet: ", curr_seq_num)
                             send_ack(curr_seq_num, addr)
                             curr_seq_num += 1
@@ -213,10 +213,10 @@ class Reldat:
                         return -1
                     else:
                         continue
-                    except TypeError:
-                        print("RECV: mangled packet.")
-                        recv_window -= 1
-                        continue
+                except TypeError:
+                    print("RECV: mangled packet.")
+                    recv_window -= 1
+                    continue
 
     def send_ack(socket, seq_num):
         header = PacketHeader()
@@ -303,10 +303,9 @@ class ReldatSocket:
     def receive(self, recv_size):
         retval = 0
         while True:
-            try:
-                data, addr = self._socket.recvfrom(int(recv_size))
-                retval = (addr, pickle.loads(data, protocol=pickle.HIGHEST_PROTOCOL))
-                break
+            data, addr = self._socket.recvfrom(int(recv_size))
+            retval = (addr, pickle.loads(data, protocol=pickle.HIGHEST_PROTOCOL))
+            break
         return retval
 
 class ReldatPacket:
