@@ -35,18 +35,14 @@ def accept(sock, window):
     connection = Connection()
 
     handshake_done = False
-
+    print("Listening...")
     while not handshake_done:
         try:
-            print("Listening...")
             addr, packet = sock.receive(MAX_RECV_SIZE)
-            print("got packet")
             if type(packet) == ReldatPacket:
                 if packet.verify() and is_syn(packet):
-                    print("sending synack")
                     send_syn_ack(sock, 1, window, addr)
-                elif packet.verify() and is_ack(packet):
-                    print("got ack")
+                elif packet.verify() and is_ack(packet) and packet.data == "HC":
                     connection.addr = addr
                     connection.seq_num = packet.header.ack_num
                     connection.ack_num = 1
@@ -66,7 +62,7 @@ def connect(sock, addr, window):
     header.syn = 1
     header.seq_num = 0
     header.window = window
-    syn_packet = ReldatPacket(header)
+    syn_packet = ReldatPacket(header, "SYNC")
 
     sock.send(pad_packet(syn_packet.serialize()), addr)
 
@@ -75,17 +71,13 @@ def connect(sock, addr, window):
 
     while True:
         try:
-            print("waiting for synack")
             addr, syn_ack_packet = sock.receive(MAX_PAYLOAD_SIZE)
-            print("got packet")
             if type(syn_ack_packet) is ReldatPacket:
                 if syn_ack_packet.verify() and is_syn_ack(syn_ack_packet):
-                    print("Handshake successful.")
                     connection.seq_num = syn_ack_packet.header.ack_num
                     connection.ack_num = 1
                     connection.receiver_window_size = syn_ack_packet.header.window
-                    print("con rec win alal:", connection.get_receiver_window_size())
-                    send_ack(sock, 1, window, addr)
+                    send_ack(sock, 1, window, addr, "HC")
                     return connection
                 else:
                     print("Handshake failed.")
@@ -130,9 +122,6 @@ def send_data(sock, data, connection):
             packets_to_send.update({curr_seq_num : packet})
             curr_seq_num += 1
 
-    print("data packetized. total packets: ", len(packets_to_send))
-    print("packets to send seq nums ", packets_to_send.keys())
-
     # reset seq num for indexing into packets_to_send
     curr_seq_num = connection.get_seq_num() + 1
 
@@ -154,6 +143,7 @@ def send_data(sock, data, connection):
         receiver_window = connection.get_receiver_window_size() - len(packets_to_ack)
         sender_window = connection.get_receiver_window_size()
 
+        print("====================================\n")
         # send batch of packets the size of the recv_window
         while receiver_window > 0 and len(packets_to_send) > 0:
             packet = packets_to_send[curr_seq_num]
@@ -177,6 +167,7 @@ def send_data(sock, data, connection):
                 if not type(packet) is ReldatPacket or not packet.verify():
                     # invalid packet so drop it
                     print("SEND: Packet not verified or wrong type. Type: ", type(packet))
+                    sender_window -= 1
                 else:
                     if packet.data == "RELDAT_TIMEOUT":
                         print("SEND: Connection timeout at receiver. Closing")
@@ -246,6 +237,8 @@ def receive_data(sock, connection):
     data_buff = ""
     curr_seq_num = connection.get_ack_num() + 1
 
+    print("====================================\n")
+
     while True:
         recv_window = connection.get_receiver_window_size()
         while recv_window > 0:
@@ -265,17 +258,20 @@ def receive_data(sock, connection):
                     elif packet.header.seq_num == curr_seq_num:
                         print("RECV: got next expected packet: ", curr_seq_num)
                         send_ack(sock, curr_seq_num, recv_window, addr)
-                        curr_seq_num += 1
                         if packet.data == "RELDAT_FINISHED":
                             print("RECV: transfer complete")
                             return data_buff
                         else:
+                            curr_seq_num += 1
                             data_buff += packet.data
                     elif packet.header.seq_num > curr_seq_num:
                         print("RECV: got higher order packet: ", curr_seq_num)
                         send_ack(sock, curr_seq_num, recv_window, addr)
                     elif packet.header.seq_num < curr_seq_num:
-                        print("RECV: got duplicate packet. Dropping")
+                        print("RECV: got duplicate packet. Dropping", packet.header.seq_num)
+                        print(packet.data)
+                        print(packet.header.syn)
+                        print(packet.header.ack)
 
             except socket.timeout:
                 print("RECV: socket timeout")
@@ -297,12 +293,12 @@ def close_connection(sock, connection):
     packet = ReldatPacket(header, "RELDAT_CLOSE")
     sock.send(pad_packet(packet.serialize()), connection.addr)
 
-def send_ack(sock, seq_num, window, addr):
+def send_ack(sock, seq_num, window, addr, data=None):
     header = PacketHeader()
     header.ack_num = seq_num
     header.ack = 1
     header.window = window
-    packet = ReldatPacket(header)
+    packet = ReldatPacket(header, data)
     sock.send(pad_packet(packet.serialize()), addr)
 
 def send_syn_ack(sock, seq_num, window, addr):

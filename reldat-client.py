@@ -14,9 +14,8 @@ def transform(filename, socket, connection):
     if retval == -1:
         print("Connection timed out")
     else:
-        print("file sent")
+        print("file sent\n")
         transformed_file = receive_data(socket, connection)
-        print(transformed_file)
         new_filename = filename.split('.')
         new_filename = new_filename[0] + "-received." + new_filename[1]
         with open(new_filename, 'w') as data:
@@ -24,7 +23,11 @@ def transform(filename, socket, connection):
         print("File written")
 
 def disconnect(socket, connection):
-    close_connection(socket, connection)
+    if type(connection) is Connection:
+        print("Disconnecting")
+        close_connection(socket, connection)
+    else:
+        print("\nNo connection to disconnect")
 
 def main():
 
@@ -44,6 +47,7 @@ def main():
 
     # set up socket
     socket = ReldatSocket()
+    connection = ""
 
     print("Please enter a command")
     print("Options are: transform and disconnect")
@@ -56,29 +60,34 @@ def main():
             if len(cmd) > 2:
                 print("invalid command")
                 continue
-            elif len(cmd) == 1 and cmd is "disconnect":
-                disconnect()
-            elif len(cmd) == 1 and cmd is not "disconnect":
-                print("invalid command")
-                continue
+            elif len(cmd) == 1:
+                if str(cmd[0]) == "disconnect":
+                    disconnect(socket, connection)
+                elif str(cmd[0]) !=  "disconnect":
+                    print("invalid command")
+                    continue
             elif len(cmd) == 2:
                 if str(cmd[0]) != "transform":
                     print("invalid command", str(cmd[0]))
                     continue
                 elif str(cmd[0]) == "transform":
                     filename = str(cmd[1])
+                    print("Connecting..")
                     connection = connect_to_server(socket, (addr,port), window_size)
-                    print("conn window size", connection.get_receiver_window_size())
                     if connection is -1:
                         print("Could not establish connection to server")
                     elif connection is 0:
                         print("Server terminated connection")
                     else:
+                        print("====================================\n")
+                        print("Connected")
                         print("sending file to transform")
+                        print("====================================\n")
                         transform(filename, socket, connection)
                     continue
         except KeyboardInterrupt:
-            disconnect()
+            disconnect(socket, connection)
+            print("Exiting\n")
             sys.exit()
 
 if __name__ == "__main__": main()
