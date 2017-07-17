@@ -28,8 +28,34 @@ class Reldat:
 
     # listen for and accept an incoming connection and complete the handshake
     # SERVER SIDE
-    def accept(socket):
-        pass
+    def accept(socket, window):
+        header = PacketHeader()
+        header.ack = 1
+        header.syn = 1
+        header.seq_num = 0
+        header.window = window
+        syn_packet = ReldatPacket(header)
+        syn_packet.source_addr = socket.gethostname()
+
+        connection = Connection()
+
+        while True:
+            try:
+                addr, packet = socket.receive(MAX_RECV_SIZE)
+                packet = pickle.loads(syn_packet)
+                if type(packet) is ReldatPacket:
+                    if packet.verify() and is_syn(packet):
+                        send_syn_ack(socket, 1, addr)
+                    elif packet.verify() and is_ack(packet):
+                        connection.seq_num = packet.header.ack_num
+                        connection.ack_num = 1
+                        connection.receiver_window_size = packet.header.window
+                        return connection
+            except socket.timeout:
+                continue
+            except TypeError:
+                continue
+
 
     # initiate a connection
     # CLINET SIDE
@@ -52,10 +78,12 @@ class Reldat:
                 addr, syn_ack_packet = socket.receive(MAX_PAYLOAD_SIZE)
                 syn_ack_packet = pickle.loads(syn_ack_packet)
                 if type(syn_ack_packet) is ReldatPacket:
-                    if syn_ack_packet.verify():
+                    if syn_ack_packet.verify() and is_syn_ack(syn_ack_packet):
                         print "Handshake successful."
-                        connection.seq_num = syn_ack_packet.seq_num
-                        connection.receiver_window_size = syn_ack_packet.window
+                        connection.seq_num = syn_ack_packet.header.ack_num
+                        connection.ack_num = 1
+                        connection.receiver_window_size = syn_ack_packet.header.window
+                        send_ack(socket, 1, addr)
                         return connection
                     else:
                         print "Handshake failed."
@@ -259,13 +287,32 @@ class Reldat:
                 except TypeError:
                     print("RECV: mangled packet.")
                     recv_window -= 1
+                    send_ack(socket, curr_seq_num)
                     continue
 
-    def send_ack(socket, seq_num):
+    def send_ack(socket, seq_num, addr):
         header = PacketHeader()
         header.ack_num = seq_num
+        header.ack = 1
         packet = ReldatPacket(header)
-        socket.send(packet, connection.addr)
+        socket.send(packet, addr)
+
+    def send_syn_ack(socket, seq_num):
+        header = PacketHeader()
+        header.ack_num = seq_num
+        header.syn = 1
+        header.ack = 1
+        packet = ReldatPacket(header)
+        socket.send(packet, addr)
+
+    def is_syn(packet):
+        return packet.header.syn == 1
+
+    def is_syn_ack(packet):
+        return packet.header.syn == 1 and packet.header.ack == 1
+
+    def is_ack(packet):
+        return packet.header.ack == 1
 
     def pad_packet(packet):
         # bytearray adds 57 bytes of overhead, so account for that
