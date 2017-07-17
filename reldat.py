@@ -126,7 +126,7 @@ class Reldat:
                         # go-back-n implementation
                         elif packet.header.ack_num < next_ack_num:
                             # delayed ack, drop it
-                            print("SEND: Received ack less than expected")
+                            print("SEND: Received ack less than expected: ", (packet.header.ack_num, next_ack_num))
                             sender_window -= 1
                         elif packet.header.ack_num > next_ack_num:
                             # received out of order ack packet
@@ -141,7 +141,7 @@ class Reldat:
 
                         elif packet.header.ack_num is next_ack_num:
                             # update next ack num using method above
-                            print("SEND: recv next ack num")
+                            print("SEND: recv next ack num: ", next_ack_num)
                             del packet_to_ack[next_ack_num]
                             next_ack_num += 1
 
@@ -167,26 +167,43 @@ class Reldat:
         signal_transfer_end(socket, connection, "RELDAT_FINISHED")
 
     # receive all data from remote
-    def receive_data(socket):
+    def receive_data(socket, connection):
 
         # keep track of timeouts
         timeouts = 0
         transfer_done  = False
         data_buff = ""
-
-
         curr_seq_num = connection.get_ack_num()
 
-
         while True:
-            curr_packets = {}
             recv_window = connection.get_receiver_window_size()
             while recv_window > 0
                 try:
                     addr, packet = socket.receive(MAX_RECV_SIZE)
                     packet = pickle.loads(packet)
-                    curr_packets.update({packet.header.seq_num : packet})
                     recv_window -= 1
+                    if not type(packet) is ReldatPacket or not packet.verify():
+                        # invalid packet so drop it
+                        print("RECV: Packet not verified or wrong type. Type: ", type(packet))
+                    else:
+                        if packet.payload == "RELDAT_TIMEOUT":
+                            print("RECV: sender timeout. closing connection")
+                            return -1
+                        elif packet.header.seq_num = curr_seq_num:
+                            print("RECV: got next expected packet: ", curr_seq_num)
+                            send_ack(curr_seq_num, addr)
+                            curr_seq_num += 1
+                            if packet.payload == "RELDAT_FINISHED":
+                                print("RECV: transfer complete")
+                                return data_buff
+                            else:
+                                data_buff += packet.payload
+                        elif packet.header.seq_num > curr_seq_num:
+                            print("RECV: got higher order packet: ", curr_seq_num)
+                            send_ack(curr_seq_num, addr)
+                        elif packet.header.seq_num < curr_seq_num:
+                            print("RECV: got duplicate packet. Dropping")
+
                 except socket.timeout:
                     print("RECV: socket timeout")
                     timeouts += 1
@@ -201,33 +218,11 @@ class Reldat:
                         recv_window -= 1
                         continue
 
-            for index in curr_packets:
-
-
-
-
-
-
-
-
-                if not type(packet) is ReldatPacket or not packet.verify():
-                    # invalid packet so drop it
-                    print("RECV: Packet not verified or wrong type. Type: ", type(packet))
-                else:
-
-                    if packet.payload == "RELDAT_TIMEOUT":
-                        print("RECV: sender timeout. closing connection")
-                        return -1
-                    elif packet.payload == "RELDAT_FINISHED":
-                        print("RECV: transfer complete")
-                        return data_buff
-                        if packet.header.seq_num == curr_seq_num:
-                            print("RECV: received next packet: ", curr_seq_num)
-                            curr_seq_num += 1
-                            data_buff += packet.payload
-
-
-
+    def send_ack(socket, seq_num):
+        header = PacketHeader()
+        header.ack_num = seq_num
+        packet = ReldatPacket(header)
+        socket.send(packet, connection.addr)
 
     def pad_packet(packet):
         # bytearray adds 57 bytes of overhead, so account for that
