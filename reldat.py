@@ -143,7 +143,7 @@ class Reldat:
                     # timeout and packet corruption?
                     packet = pickle.loads(padded_packet)
 
-                    if not packet.verify():
+                    if not isinstance(type(packet), Reldatpacket.Reldatpacket) or packet.verify():
                         # invalid packet so drop it
                         # ALSO CHECK TO SEE IF THE PACKET IS EVEN OF TYPE PACKET
                         pass
@@ -155,6 +155,7 @@ class Reldat:
                             # also check to see if we didn't already get a higher ack
                             # e.g this could be a dup ack. consult the packets_to_be_acked dict
                             # ordered data structure for queued packets?
+                            pass
                         elif packet.header.ack_num > next_ack_num:
                             # received out of order ack packet
                             # we can update next ack num since we know any preceding
@@ -162,10 +163,13 @@ class Reldat:
                             # use the seq num in this packet to determine next ack num
                             # as in line 78
                             # BE SURE TO REMOVE PACKET FROM packet_to_ack
+                            pass
                         elif packet.header.ack_num is next_ack_num:
                             # update next ack num using method above
+                            pass
                 except socket.timeout:
                     # HANDLE TIMEOUTS
+                    pass
 
         # implement this method to signal to the client that the data transfer is over
         # put some identifying text in the payload or something
