@@ -6,13 +6,22 @@ from reldat import *
 def connect_to_server(socket, addr, window_size):
     return connect(socket, addr, window_size)
 
-def transform(filename, connection):
+def transform(filename, socket, connection):
     lowercase = ""
     with open(filename, "r") as data:
         lowercase = data.read()
-    send_data(socket, "TRANSFORM" + lowercase, connection)
-    transformed_file = receive_data(socket, connection)
-    return transformed_file
+    retval = send_data(socket, "TRANSFORM" + lowercase, connection)
+    if retval == -1:
+        print("Connection timed out")
+    else:
+        print("file sent")
+        transformed_file = receive_data(socket, connection)
+        print(transformed_file)
+        new_filename = filename.split('.')
+        new_filename = new_filename[0] + "-received." + new_filename[1]
+        with open(new_filename, 'w') as data:
+            data.write(transformed_file)
+        print("File written")
 
 def disconnect(socket, connection):
     close_connection(socket, connection)
@@ -59,12 +68,14 @@ def main():
                 elif str(cmd[0]) == "transform":
                     filename = str(cmd[1])
                     connection = connect_to_server(socket, (addr,port), window_size)
+                    print("conn window size", connection.get_receiver_window_size())
                     if connection is -1:
                         print("Could not establish connection to server")
                     elif connection is 0:
                         print("Server terminated connection")
                     else:
-                        new_file = transform(filename)
+                        print("sending file to transform")
+                        transform(filename, socket, connection)
                     continue
         except KeyboardInterrupt:
             disconnect()

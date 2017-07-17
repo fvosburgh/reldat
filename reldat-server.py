@@ -24,22 +24,25 @@ def main():
     while True:
         try:
             connection = accept(socket, window_size)
+            print("handshake done")
+            print(connection.addr)
             recv_data = receive_data(socket, connection)
             if "TRANSFORM" in recv_data:
-                transform_and_send(recv_data.split(" ")[1], connection)
+                print("transforming data")
+                data = recv_data.split("TRANSFORM")[1]
+                transform_and_send(data, connection)
         except KeyboardInterrupt:
             disconnect(socket, connection)
             print("Exiting")
+            sys.exit()
 
 def setup(port):
     server_addr = '0.0.0.0'
     socket.bind(server_addr, port)
 
-def transform_and_send(filename, connection):
-    lowercase = ""
-    with open(filename, "r") as data:
-        lowercase = data.read()
-    send_data(socket, lowercase.upper(), connection)
+def transform_and_send(data, connection):
+    print("Strating transform")
+    send_data(socket, data.upper(), connection)
 
 def disconnect(socket, connection):
     close_connection(socket, connection)
