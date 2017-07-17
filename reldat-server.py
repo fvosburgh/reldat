@@ -10,16 +10,16 @@ def main():
 
     # check CLI arguments
     try:
-        if len(sys.argv) != 3:
+        if len(sys.argv) != 4:
             raise Exception("Usage: reldat-server <port> <max window recv size>")
     except Exception as error:
         print(repr(error))
         sys.exit()
 
-    port = int(str(sys.argv[1]))
+    port = int(str(sys.argv[2]))
     setup(port)
 
-    window_size = int(str(sys.argv[2]))
+    window_size = int(str(sys.argv[3]))
 
     while True:
         try:
@@ -28,12 +28,12 @@ def main():
             if "TRANSFORM" in recv_data:
                 transform_and_send(recv_data.split(" ")[1], connection)
         except KeyboardInterrupt:
-            disconnect()
-            print "Exiting"
+            disconnect(socket, connection)
+            print("Exiting")
 
 def setup(port):
-    server_addr = ('0.0.0.0', port)
-    socket.bind(server_addr)
+    server_addr = '0.0.0.0'
+    socket.bind(server_addr, port)
 
 def transform_and_send(filename, connection):
     lowercase = ""
