@@ -33,8 +33,39 @@ class Reldat:
 
     # initiate a connection
     # CLINET SIDE
-    def connect(socket, addr):
-        pass
+    def connect(socket, addr, window):
+        header = PacketHeader()
+        header.syn = 1
+        header.seq_num = 0
+        header.window = window
+        syn_packet = ReldatPacket(header)
+        syn_packet.source_addr = socket.gethostname()
+        syn_packet.dest_addr = addr
+
+        socket.send(pad_packet(syn_packet.serialize()), addr)
+
+        connection = Connection()
+        connection.addr = addr
+
+        while True:
+            try:
+                addr, syn_ack_packet = socket.receive(MAX_PAYLOAD_SIZE)
+                syn_ack_packet = pickle.loads(syn_ack_packet)
+                if type(syn_ack_packet) is ReldatPacket:
+                    if syn_ack_packet.verify():
+                        print "Handshake successful."
+                        connection.seq_num = syn_ack_packet.seq_num
+                        connection.receiver_window_size = syn_ack_packet.window
+                        return connection
+                    else:
+                        print "Handshake failed."
+                        return -1
+            except socket.timeout:
+                print("Handshake timeout")
+                return -1
+            except TypeError:
+                print("Got mangled SYNACK")
+                return -1
 
     # send all data to remote
     def send_data(socket, data, connection):
