@@ -1,12 +1,10 @@
-import socket
 import sys
-import signal
+from reldat import *
 
-max_payload = 1000
+
 window_size = 0
 
-# set up UDP socket
-udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+socket = ReldatSocket()
 
 def main():
 
@@ -23,14 +21,28 @@ def main():
 
     window_size = int(str(sys.argv[2]))
 
-    try:
-        listen()
-    except KeyboardInterrupt:
-        teardown()
-        print "Exiting"
+    while True:
+        try:
+            connection = accept(socket, window_size)
+            recv_data = receive_data(socket, connection)
+            if "TRANSFORM" in recv_data:
+                transform_and_send(recv_data.split(" ")[1], connection)
+        except KeyboardInterrupt:
+            disconnect()
+            print "Exiting"
 
 def setup(port):
     server_addr = ('0.0.0.0', port)
-    udp_socket.bind(server_addr)
+    socket.bind(server_addr)
 
-def teardown()
+def transform_and_send(filename, connection):
+    lowercase = ""
+    with open(filename, "r") as data:
+        lowercase = data.read()
+    send_data(socket, lowercase.upper(), connection)
+
+def disconnect(socket, connection):
+    close_connection(socket, connection)
+
+
+if __name__ == "__main__": main()

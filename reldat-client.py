@@ -45,6 +45,8 @@ def main():
                 connection = connect(socket, addr, window_size)
                 if connection is -1:
                     print("Could not establish connection to server")
+                elif connection is 0:
+                    print("Server terminated connection")
                 else:
                     new_file = transform(filename)
                 continue
@@ -53,15 +55,17 @@ def main():
         return connect(socket, addr, window_size)
 
     def transform(filename, connection):
-        send_data(socket, "TRANSFORM " + str(filename), connection)
+        lowercase = ""
+        with open(filename, "r") as data:
+            lowercase = data.read()
+        send_data(socket, "TRANSFORM" + lowercase, connection)
         transformed_file = receive_data(socket, connection)
         return transformed_file
 
     def disconnect(socket, connection):
         close_connection(socket, connection)
 
-
-
+if __name__ == "__main__": main()
 
 
 
