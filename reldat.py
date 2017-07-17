@@ -2,6 +2,7 @@ import socket
 import hashlib
 import pickle
 import sys
+import time
 from threading import Thread, Lock
 from io import BytesIO
 
@@ -28,12 +29,42 @@ class Reldat:
     # listen for and accept an incoming connection and complete the handshake
     # SERVER SIDE
     def accept(socket):
-        pass
+        client_syn_packet = receive_data(socket)
+
+        # if client_syn_packet is legit
+        syn_ack_packet = ReldatPacket()
+        syn_ack_packet.header = PacketHeader()
+        syn_ack_packet.header.syn = 1
+        syn_ack_packet.header.ack = 1
+
+        send_data(socket, syn_ack_packet, connection)
 
     # initiate a connection
-    # CLINET SIDE
-    def connect(socket, addr):
-        pass
+    # CLIENT SIDE
+    # We are essentially doing a two way handshake because we don't need to
+    # synchronize seq/ack nums, we always start at 0. Third packet in handshake
+    # is just the first sent packet
+    def connect(socket, addr): # Do we need socket AND addr?
+        syn_packet = ReldatPacket()
+        syn_packet.header = PacketHeader()
+        syn_packet.header.syn = 1
+        syn_packet.source_addr = socket.gethostname()
+        syn_packet.dest_addr = addr
+
+        connection = Connection()
+        connection.addr = addr
+
+        send_data(socket, syn_packet, connection)
+
+        while 1:
+            syn_ack_packet = receive_data(socket)
+            if syn_ack_packet is not None:
+                if syn_ack_packet.verify():
+                    print "Handshake successful."
+                    return connection
+                else:
+                    print "Handshake failed."
+                    break
 
     # send all data to remote
     def send_data(socket, data, connection):
