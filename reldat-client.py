@@ -1,27 +1,92 @@
 import socket
 import sys
 import signal
-
-max_payload = 1000
-window_size = 0
-
-udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+from reldat import *
 
 def main():
 
     # check input arguments
     try:
-        if len(sys.argv) != 2:
+        if len(sys.argv) != 3:
             raise Exception("Usage: reldat-client <host>:<port> <max window recv size>")
     except Exception as error:
         print(repr(error))
         sys.exit()
 
     # arg parsing
-    addrstr = int(str(sys.argv[0]))
+    addrstr = int(str(sys.argv[1]))
     addr,port = addrstr.split(":")
-    window_size = int(str(sys.argv[1]))
-    set_window(window_size)
+    window_size = int(str(sys.argv[2]))
+
+    # set up socket
+    socket = ReldatSocket()
+
+    print("Please enter a command")
+    print("Options are: transform and disconnect")
+
+    # command loop
+    while True:
+        cmd = input("Command: ").split(" ")
+
+        if len(cmd) > 2:
+            print("invalid command")
+            continue
+        elif len(cmd) == 1 and cmd is "disconnect"
+            disconnect()
+        elif len(cmd) == 1 and cmd is not "disconnect"
+            print("invalid command")
+            continue
+        elif len(cmd) == 2
+            if cmd[0] is not "transform":
+                print("invalid command")
+                continue
+            elif cmd[0] is "transform":
+                filename = cmd[1]
+                connection = connect(socket, addr, window_size)
+                if connection is -1:
+                    print("Could not establish connection to server")
+                else:
+                    new_file = transform(filename)
+                continue
+
+    def connect(socket, addr, window_size):
+        return connect(socket, addr, window_size)
+
+    def transform(filename, connection):
+        send_data(socket, "TRANSFORM " + str(filename), connection)
+        transformed_file = receive_data(socket, connection)
+        return transformed_file
+
+    def disconnect(socket, connection):
+        close_connection(socket, connection)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     # 1. CONNECT TO SERV PROCEDURE
     connection = setup(addr, port)

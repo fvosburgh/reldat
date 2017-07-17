@@ -47,6 +47,7 @@ class Reldat:
                     if packet.verify() and is_syn(packet):
                         send_syn_ack(socket, 1, addr)
                     elif packet.verify() and is_ack(packet):
+                        connection.addr = addr
                         connection.seq_num = packet.header.ack_num
                         connection.ack_num = 1
                         connection.receiver_window_size = packet.header.window
@@ -79,14 +80,14 @@ class Reldat:
                 syn_ack_packet = pickle.loads(syn_ack_packet)
                 if type(syn_ack_packet) is ReldatPacket:
                     if syn_ack_packet.verify() and is_syn_ack(syn_ack_packet):
-                        print "Handshake successful."
+                        print("Handshake successful.")
                         connection.seq_num = syn_ack_packet.header.ack_num
                         connection.ack_num = 1
                         connection.receiver_window_size = syn_ack_packet.header.window
                         send_ack(socket, 1, addr)
                         return connection
                     else:
-                        print "Handshake failed."
+                        print("Handshake failed.")
                         return -1
             except socket.timeout:
                 print("Handshake timeout")
@@ -260,6 +261,9 @@ class Reldat:
                         if packet.payload == "RELDAT_TIMEOUT":
                             print("RECV: sender timeout. closing connection")
                             return -1
+                        elif packet.payload == "RELDAT_CLOSE":
+                            print("RECV: connection closed")
+                            return 0
                         elif packet.header.seq_num == curr_seq_num:
                             print("RECV: got next expected packet: ", curr_seq_num)
                             send_ack(curr_seq_num, addr)
@@ -289,6 +293,11 @@ class Reldat:
                     recv_window -= 1
                     send_ack(socket, curr_seq_num)
                     continue
+
+    def close_connection(socket, connection):
+        header = PacketHeader()
+        packet = ReldatPacket(header, "RELDAT_CLOSE")
+        socket.send(packet, connection.addr)
 
     def send_ack(socket, seq_num, addr):
         header = PacketHeader()
