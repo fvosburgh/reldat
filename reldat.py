@@ -36,11 +36,18 @@ def accept(sock, window):
 
     while True:
         try:
+            print("Listening...")
             addr, packet = sock.receive(MAX_RECV_SIZE)
             print("Got packet from ", addr)
-            packet = pickle.loads(syn_packet)
-            if type(packet) is ReldatPacket:
+            print(packet.data)
+            print("verify result: ", packet.verify())
+            print("header chksum ", packet.header.checksum)
+            print("calc chksum ", packet.checksum())
+            print("size of data in bytes ", sys.getsizeof(packet.data))
+            print("size of packet in bytes ", sys.getsizeof(packet))
+            if type(packet) == ReldatPacket:
                 if packet.verify() and is_syn(packet):
+                    print("sending synack")
                     send_syn_ack(sock, 1, addr)
                 elif packet.verify() and is_ack(packet):
                     connection.addr = addr
@@ -50,7 +57,9 @@ def accept(sock, window):
                     return connection
         except socket.timeout:
             continue
-        except TypeError:
+        except TypeError as e:
+            print("Packet mangled. Type: ", type(packet))
+            print(e)
             continue
 
 
@@ -63,6 +72,11 @@ def connect(sock, addr, window):
     header.window = window
     syn_packet = ReldatPacket(header)
 
+    print("sending packet of size: ", sys.getsizeof(pad_packet(syn_packet.serialize())))
+    print("size of data in bytes", sys.getsizeof(syn_packet.data))
+    print("chksum of packet: ", syn_packet.header.checksum)
+    print("verify ", syn_packet.verify())
+    print("size of packet ", sys.getsizeof(syn_packet))
     sock.send(pad_packet(syn_packet.serialize()), addr)
 
     connection = Connection()
@@ -70,8 +84,9 @@ def connect(sock, addr, window):
 
     while True:
         try:
+            print("waiting for synack")
             addr, syn_ack_packet = sock.receive(MAX_PAYLOAD_SIZE)
-            syn_ack_packet = pickle.loads(syn_ack_packet)
+            print("got packet")
             if type(syn_ack_packet) is ReldatPacket:
                 if syn_ack_packet.verify() and is_syn_ack(syn_ack_packet):
                     print("Handshake successful.")
@@ -163,12 +178,7 @@ def send_data(sock, data, connection):
         # use try block to handle timeouts
         while sender_window > 0 and len(packets_to_ack) > 0:
             try:
-                addr, padded_packet = sock.receive(MAX_RECV_SIZE)
-
-                # concern about error handling here. Differentiate between
-                # timeout and packet corruption?
-                packet = pickle.loads(padded_packet)
-
+                addr, packet = sock.receive(MAX_RECV_SIZE)
                 if not type(packet) is ReldatPacket or not packet.verify():
                     # invalid packet so drop it
                     print("SEND: Packet not verified or wrong type. Type: ", type(packet))
@@ -246,7 +256,6 @@ def receive_data(sock, connection):
         while recv_window > 0:
             try:
                 addr, packet = sock.receive(MAX_RECV_SIZE)
-                packet = pickle.loads(packet)
                 recv_window -= 1
                 if not type(packet) is ReldatPacket or not packet.verify():
                     # invalid packet so drop it
@@ -300,7 +309,7 @@ def send_ack(sock, seq_num, addr):
     packet = ReldatPacket(header)
     sock.send(packet, addr)
 
-def send_syn_ack(sock, seq_num):
+def send_syn_ack(sock, seq_num, addr):
     header = PacketHeader()
     header.ack_num = seq_num
     header.syn = 1
@@ -319,7 +328,7 @@ def is_ack(packet):
 
 def pad_packet(packet):
     # bytearray adds 57 bytes of overhead, so account for that
-    padding_size = MAX_RECV_SIZE - sys.getsizeof(packet) - 57
+    padding_size = MAX_RECV_SIZE - sys.getsizeof(packet)
     return packet + bytearray(padding_size)
 
 def signal_transfer_end(sock, connection, data):
@@ -396,8 +405,8 @@ class ReldatSocket:
     def receive(self, recv_size):
         retval = 0
         while True:
-            data, addr = self._socket.recvfrom(int(recv_size))
-            retval = (addr, pickle.loads(data, protocol=pickle.HIGHEST_PROTOCOL))
+            data, addr = self._socket.recvfrom(recv_size)
+            retval = (addr, pickle.loads(data))
             break
         return retval
 
