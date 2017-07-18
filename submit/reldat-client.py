@@ -10,12 +10,12 @@ def transform(filename, socket, connection):
     lowercase = ""
     with open(filename, "r") as data:
         lowercase = data.read()
-    connection = send_data(socket, "TRANSFORM" + lowercase, connection)
-    if connection == -1:
+    retval = send_data(socket, "TRANSFORM" + lowercase, connection)
+    if retval == -1:
         print("Connection timed out")
     else:
         print("file sent\n")
-        connection, transformed_file = receive_data(socket, connection)
+        transformed_file = receive_data(socket, connection)
         new_filename = filename.split('.')
         new_filename = new_filename[0] + "-received." + new_filename[1]
         with open(new_filename, 'w') as data:
@@ -71,25 +71,20 @@ def main():
                     print("invalid command", str(cmd[0]))
                     continue
                 elif str(cmd[0]) == "transform":
-                    retries = 5
-                    done = False
                     filename = str(cmd[1])
-                    while retries > 0 and done is False:
-                        print("Connecting..\n")
-                        connection = connect_to_server(socket, (addr,port), window_size)
-                        if connection is -1:
-                            print("Could not establish connection to server")
-                        elif connection is 0:
-                            print("Server terminated connection")
-                        elif connection is -2:
-                            retries -= 1
-                        else:
-                            print("\n====================================\n")
-                            print("Connected")
-                            print("sending file to transform")
-                            transform(filename, socket, connection)
-                            done = True
-                        continue
+                    print("Connecting..")
+                    connection = connect_to_server(socket, (addr,port), window_size)
+                    if connection is -1:
+                        print("Could not establish connection to server")
+                    elif connection is 0:
+                        print("Server terminated connection")
+                    else:
+                        print("====================================\n")
+                        print("Connected")
+                        print("sending file to transform")
+                        print("====================================\n")
+                        transform(filename, socket, connection)
+                    continue
         except KeyboardInterrupt:
             disconnect(socket, connection)
             print("Exiting\n")

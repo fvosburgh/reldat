@@ -24,21 +24,18 @@ def main():
     while True:
         try:
             connection = accept(socket, window_size)
-            print("\n====================================\n")
+            print("====================================\n")
             print("Connection from: ", connection.addr)
-            print("\n====================================\n")
-            connection, recv_data = receive_data(socket, connection, True)
+            print("====================================\n")
+            recv_data = receive_data(socket, connection)
             if recv_data == -1:
                 print("Connection timed out")
-            elif recv_data == 0:
-                print("Connection closed at client")
-            elif type(recv_data) and "TRANSFORM" in recv_data:
+            elif "TRANSFORM" in recv_data:
                 print("transforming data")
                 data = recv_data.split("TRANSFORM")[1]
                 transform_and_send(data, connection)
         except KeyboardInterrupt:
-            if type(connection) is Connection:
-                disconnect(socket, connection)
+            disconnect(socket, connection)
             print("Exiting")
             sys.exit()
 
@@ -48,7 +45,7 @@ def setup(port):
 
 def transform_and_send(data, connection):
     print("Strating transform")
-    return send_data(socket, data.upper(), connection)
+    send_data(socket, data.upper(), connection)
 
 def disconnect(socket, connection):
     close_connection(socket, connection)

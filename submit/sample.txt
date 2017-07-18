@@ -1,0 +1,130 @@
+SERVER SIDE
+================================================================================
+parahorse@DESKTOP-02IGM1S:/mnt/d/last_semester/networking/prog2$ python3 reldat-server.py 2001 10
+Socket initialized
+Socket bound to port 2001
+Listening...
+====================================
+
+Connection from:  ('127.0.0.1', 62777)
+====================================
+
+====================================
+
+RECV: got next expected packet:  2
+RECV: got next expected packet:  3
+RECV: got next expected packet:  4
+RECV: got next expected packet:  5
+RECV: got next expected packet:  6
+RECV: got next expected packet:  7
+RECV: got next expected packet:  8
+RECV: got next expected packet:  9
+RECV: got next expected packet:  10
+RECV: got next expected packet:  11
+RECV: got next expected packet:  12
+RECV: got next expected packet:  13
+RECV: got next expected packet:  14
+RECV: transfer complete
+transforming data
+Strating transform
+SEND: curr seq num  2
+data packetized. total packets:  11
+packets to send seq nums  dict_keys([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+====================================
+
+SEND: sending packet:  2
+SEND: sending packet:  3
+SEND: sending packet:  4
+SEND: sending packet:  5
+SEND: sending packet:  6
+SEND: sending packet:  7
+SEND: sending packet:  8
+SEND: sending packet:  9
+SEND: sending packet:  10
+SEND: sending packet:  11
+SEND: recv next ack num:  2
+SEND: recv next ack num:  3
+SEND: recv next ack num:  4
+SEND: recv next ack num:  5
+SEND: recv next ack num:  6
+SEND: recv next ack num:  7
+SEND: recv next ack num:  8
+SEND: recv next ack num:  9
+SEND: recv next ack num:  10
+SEND: recv next ack num:  11
+====================================
+
+SEND: sending packet:  12
+SEND: recv next ack num:  12
+Listening...
+^CExiting
+
+CLIENT SIDE
+==================================================================================
+parahorse@DESKTOP-02IGM1S:/mnt/d/last_semester/networking/prog2$ python3 reldat-client.py 127.0.0.1:2001 10
+Socket initialized
+Please enter a command
+Options are: transform and disconnect
+Command: transform test_file.txt
+Connecting..
+====================================
+
+Connected
+sending file to transform
+====================================
+
+SEND: curr seq num  2
+data packetized. total packets:  12
+packets to send seq nums  dict_keys([2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13])
+====================================
+
+SEND: sending packet:  2
+SEND: sending packet:  3
+SEND: sending packet:  4
+SEND: sending packet:  5
+SEND: sending packet:  6
+SEND: sending packet:  7
+SEND: sending packet:  8
+SEND: sending packet:  9
+SEND: sending packet:  10
+SEND: sending packet:  11
+SEND: recv next ack num:  2
+SEND: recv next ack num:  3
+SEND: recv next ack num:  4
+SEND: recv next ack num:  5
+SEND: recv next ack num:  6
+SEND: recv next ack num:  7
+SEND: recv next ack num:  8
+SEND: recv next ack num:  9
+SEND: recv next ack num:  10
+SEND: recv next ack num:  11
+====================================
+
+SEND: sending packet:  12
+SEND: sending packet:  13
+SEND: recv next ack num:  12
+SEND: recv next ack num:  13
+file sent
+
+====================================
+
+RECV: got duplicate packet. Dropping 0
+
+0
+1
+RECV: got next expected packet:  2
+RECV: got next expected packet:  3
+RECV: got next expected packet:  4
+RECV: got next expected packet:  5
+RECV: got next expected packet:  6
+RECV: got next expected packet:  7
+RECV: got next expected packet:  8
+RECV: got next expected packet:  9
+RECV: got next expected packet:  10
+RECV: got next expected packet:  11
+RECV: got next expected packet:  12
+RECV: got next expected packet:  13
+RECV: transfer complete
+File written
+Command: ^CDisconnecting
+Exiting
